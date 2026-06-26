@@ -1,0 +1,4 @@
+server/storage/*.json
+!.gitkeep
+.env
+node_modules/

@@ -1,0 +1,16 @@
+{
+  "name": "fc-matchhub-fullstack",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FC MatchHub Pro Clubs manager app prototype with separated client and server.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node server/index.js",
+    "start": "node server/index.js"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}
