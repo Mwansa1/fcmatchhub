@@ -97,6 +97,7 @@ function clubLogoMarkup(club, className = 'club-emblem') {
 
 function initialView() {
   const path = window.location.pathname.replace(/^\/+/, '');
+  if (path === 'creator-admin' || path === 'admin') return 'creator-admin';
   if (localStorage.getItem('fcm-authenticated') === 'true') return path && !['join', 'login', 'forgot-password', 'reset-password'].includes(path) ? (path === 'admin' ? 'creator-admin' : path) : 'home';
   return ['join', 'login', 'forgot-password', 'reset-password'].includes(path) ? path : 'landing';
 }
@@ -112,6 +113,7 @@ function appPath(view) {
 
 function viewFromPath() {
   const path = window.location.pathname.replace(/^\/+/, '') || 'landing';
+  if (path === 'creator-admin' || path === 'admin') return 'creator-admin';
   if (state.authenticated) return path === 'landing' ? 'home' : path === 'admin' ? 'creator-admin' : path;
   return ['join', 'login', 'forgot-password', 'reset-password'].includes(path) ? path : 'landing';
 }
@@ -155,6 +157,10 @@ async function load() {
     { title: 'Welcome to MatchHub', note: 'Your club dashboard is ready.', time: 'Now' }
   ];
   state.data.admin = state.data.admin || { availableBalance: 0, pendingWithdrawals: 0, revenue: 0, transactions: [], pendingRequests: [] };
+  if (state.view === 'creator-admin') {
+    renderCreatorAdminShell();
+    return;
+  }
   if (state.authenticated) {
     if (state.view === 'creator-admin') {
       setView('creator-admin', false);
@@ -325,6 +331,14 @@ function navButton(item) {
 }
 
 function setView(view, updateHistory = true) {
+  if (view === 'creator-admin') {
+    state.view = view;
+    document.body.dataset.page = view;
+    if (updateHistory && window.location.pathname !== appPath(view)) window.history.pushState({}, '', appPath(view));
+    renderCreatorAdminShell();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
   if (!state.authenticated) {
     setPublicView(view === 'join' || view === 'login' ? view : 'landing', updateHistory);
     return;
@@ -332,11 +346,6 @@ function setView(view, updateHistory = true) {
   state.view = view;
   document.body.dataset.page = view;
   if (updateHistory && window.location.pathname !== appPath(view)) window.history.pushState({}, '', appPath(view));
-  if (view === 'creator-admin') {
-    renderCreatorAdminShell();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    return;
-  }
   if (!document.querySelector('#view')) renderShell();
   document.querySelectorAll('[data-view]').forEach((node) => {
     node.classList.toggle('active', node.dataset.view === view);
