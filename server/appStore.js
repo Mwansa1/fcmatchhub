@@ -244,12 +244,71 @@ async function requestPayoutReview(payload) {
   return { state: await writeState(state), request };
 }
 
+async function resolveDispute(id, decision, note = "") {
+  const state = await readState();
+  const dispute = (state.disputes || []).find((item) => item.id === id);
+  if (!dispute) return null;
+
+  const decisions = {
+    approve: {
+      status: "Resolved",
+      title: "Dispute resolved - payout approved",
+      walletStatus: "Completed",
+      notification: "Admin approved the payout after dispute review."
+    },
+    reject: {
+      status: "Rejected",
+      title: "Dispute resolved - claim rejected",
+      walletStatus: "Rejected",
+      notification: "Admin rejected the dispute claim after review."
+    },
+    review: {
+      status: "In Review",
+      title: "Dispute kept in review",
+      walletStatus: "In Review",
+      notification: "Admin kept the dispute under review."
+    }
+  };
+  const resolution = decisions[decision] || decisions.review;
+
+  dispute.status = resolution.status;
+  dispute.adminDecision = resolution.title;
+  dispute.adminNote = note || resolution.notification;
+  dispute.resolvedAt = new Date().toISOString();
+
+  const transaction = {
+    title: resolution.title,
+    note: `${dispute.match}${note ? ` - ${note}` : ""}`,
+    amount: Number(dispute.funds || 0),
+    status: resolution.walletStatus,
+    date: nowLabel()
+  };
+
+  state.wallet.transactions = [transaction, ...(state.wallet.transactions || [])];
+  state.wallet.pendingRequests = (state.wallet.pendingRequests || []).filter((item) => item.note !== dispute.match);
+  state.admin.transactions = [transaction, ...(state.admin.transactions || [])];
+  state.admin.pendingRequests = (state.admin.pendingRequests || []).filter((item) => item.note !== dispute.match);
+
+  if (decision === "approve") {
+    state.wallet.heldFunds = Math.max(Number(state.wallet.heldFunds || 0) - Number(dispute.funds || 0), 0);
+    state.wallet.availableBalance = Number(state.wallet.availableBalance || 0) + Number(dispute.funds || 0);
+  }
+
+  addNotification(state, {
+    title: resolution.title,
+    note: `${dispute.match}: ${dispute.adminNote}`
+  });
+
+  return { state: await writeState(state), dispute };
+}
+
 module.exports = {
   addMatch,
   addTournament,
   joinTournament,
   readState,
   recordWalletTransaction,
+  resolveDispute,
   requestPayoutReview,
   updateMatchStatus
 };

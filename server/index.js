@@ -413,6 +413,28 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, { ok: false, message: error.message }, 400);
     }
   }
+  if (url.pathname.startsWith("/api/disputes/") && url.pathname.endsWith("/resolve") && req.method === "POST") {
+    try {
+      if (!(await sessionStore.requireRole(req, "admin"))) {
+        return sendJson(res, { ok: false, message: "Admin session required to resolve disputes." }, 403);
+      }
+      const body = await readJsonBody(req);
+      const id = decodeURIComponent(url.pathname.split("/")[3]);
+      const allowed = ["approve", "reject", "review"];
+      if (!allowed.includes(body.decision)) return sendJson(res, { ok: false, message: "Invalid dispute decision." }, 422);
+
+      const result = await appStore.resolveDispute(id, body.decision, body.note || "");
+      if (!result) return sendJson(res, { ok: false, message: "Dispute not found." }, 404);
+      return sendJson(res, {
+        ok: true,
+        message: `Dispute ${result.dispute.status.toLowerCase()}.`,
+        dispute: result.dispute,
+        data: result.state
+      });
+    } catch (error) {
+      return sendJson(res, { ok: false, message: error.message }, 400);
+    }
+  }
   if (url.pathname === "/api/payments/deposit" && req.method === "POST") {
     try {
       const body = await readJsonBody(req);

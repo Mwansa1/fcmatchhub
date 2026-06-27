@@ -1009,7 +1009,8 @@ function settingsView() {
 }
 
 function adminView() {
-  const { admin } = state.data;
+  const { admin, disputes } = state.data;
+  const openDisputes = (disputes || []).filter((dispute) => !['Resolved', 'Rejected'].includes(dispute.status));
   return `
     <section class="app-page">
       <div class="app-grid">
@@ -1027,6 +1028,12 @@ function adminView() {
             </div>
             <div class="data-list">${admin.transactions.map(transactionRow).join('')}</div>
           </div>
+          <div class="app-shell">
+            ${cardHead('bi-shield-fill-exclamation', 'Dispute Review', 'creator-admin', 'red')}
+            <div class="data-list">
+              ${openDisputes.length ? openDisputes.map(adminDisputeRow).join('') : emptyState('No open disputes', 'Submitted match and payout disputes will appear here for creator review.')}
+            </div>
+          </div>
         </div>
         <aside class="app-side">
           ${adminWithdrawForm()}
@@ -1034,6 +1041,25 @@ function adminView() {
         </aside>
       </div>
     </section>
+  `;
+}
+
+function adminDisputeRow(dispute) {
+  return `
+    <div class="data-row dispute-admin-row">
+      <div class="row-icon"><i class="bi bi-shield-fill-exclamation"></i></div>
+      <div>
+        <div class="row-title">${dispute.match}</div>
+        <div class="row-sub">${dispute.reason} Submitted: ${dispute.submittedScore}. Contested: ${dispute.contestedScore}.</div>
+        <div class="row-sub">Funds held: ${money(dispute.funds)} ${dispute.adminDecision ? `/ ${dispute.adminDecision}` : ''}</div>
+      </div>
+      <div class="admin-dispute-actions">
+        ${statusPill(dispute.status)}
+        <button class="action-btn accept" type="button" data-dispute-decision="approve" data-dispute-id="${dispute.id}">Approve Payout</button>
+        <button class="action-btn details" type="button" data-dispute-decision="review" data-dispute-id="${dispute.id}">Keep Review</button>
+        <button class="action-btn danger" type="button" data-dispute-decision="reject" data-dispute-id="${dispute.id}">Reject Claim</button>
+      </div>
+    </div>
   `;
 }
 
@@ -1287,6 +1313,32 @@ document.addEventListener('click', async (event) => {
     state.data = result.data;
     showToast(result.message);
     setView(state.view, false);
+    return;
+  }
+
+  const disputeDecisionButton = event.target.closest('[data-dispute-decision]');
+  if (disputeDecisionButton) {
+    const decisionLabels = {
+      approve: 'Payout approved after admin review.',
+      reject: 'Dispute claim rejected after admin review.',
+      review: 'Dispute kept in review for more proof.'
+    };
+    const response = await fetch(`/api/disputes/${encodeURIComponent(disputeDecisionButton.dataset.disputeId)}/resolve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        decision: disputeDecisionButton.dataset.disputeDecision,
+        note: decisionLabels[disputeDecisionButton.dataset.disputeDecision]
+      })
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      showToast(result.message || 'Dispute resolution failed.');
+      return;
+    }
+    state.data = result.data;
+    showToast(result.message);
+    setView('creator-admin', false);
     return;
   }
 
